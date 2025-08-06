@@ -1,0 +1,59 @@
+# Run with:
+# docker compose -f examples/aloha_real/compose.yml up --build
+services:
+  runtime:
+    image: lyl472324464/robot:aloha-ros1.0
+    depends_on:
+      - aloha_ros_nodes
+      - ros_master
+      - openpi_server
+    command: python3 /app/examples/aloha_real/main.py
+    init: true
+    tty: true
+    network_mode: host
+    privileged: true
+    volumes:
+      - $PWD:/app
+      - ../../data:/data
+
+  aloha_ros_nodes:
+    image: lyl472324464/robot:aloha-ros1.0
+    depends_on:
+      - ros_master
+    init: true
+    tty: true
+    network_mode: host
+    privileged: true
+    volumes:
+      - /dev:/dev
+    command: roslaunch --wait aloha ros_nodes.launch
+
+  ros_master:
+    image: ros:noetic-robot
+    network_mode: host
+    privileged: true
+    command:
+      - roscore
+
+  openpi_server:
+    image: lyl472324464/robot:openpi_server
+    command: uv run scripts/serve_policy.py --env ALOHA --default_prompt='uncap the pen'
+    init: true
+    tty: true
+    network_mode: host
+    volumes:
+      - $PWD:/app
+      - ${OPENPI_DATA_HOME:-~/.cache/openpi}:/openpi_assets
+    environment:
+      - SERVER_ARGS
+      - OPENPI_DATA_HOME=/openpi_assets
+      - IS_DOCKER=true
+
+    # Comment out this block if not running on a machine with GPUs.
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
