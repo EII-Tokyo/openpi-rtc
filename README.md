@@ -1,6 +1,6 @@
 # Openpi-RTC
 
-This repository implements [**Real-Time Action Chunking (RTC)**](https://www.physicalintelligence.company/download/real_time_chunking.pdf) for the [openpi](https://github.com/Physical-Intelligence/openpi) framework, with comprehensive testing on the ALOHA robot platform using the `pi0_aloha_pen_uncap` model. Our experimental results demonstrate performance improvements: **RTC reduces task completion time from 10 seconds to 9 seconds** for the pen uncapping task. As shown in our [demonstration video](./assets/uncap.mov), when the robotic arm approaches the pen, the RTC-enabled model exhibits notably faster response times compared to the baseline implementation without RTC.
+This repository implements [**Real-Time Action Chunking (RTC)**](https://www.physicalintelligence.company/download/real_time_chunking.pdf) for the [openpi](https://github.com/Physical-Intelligence/openpi) framework, with comprehensive testing on the ALOHA robot platform using the `pi0_aloha_pen_uncap` model. Our experimental results demonstrate performance improvements: **RTC reduces task completion time from 10 seconds to 9 seconds** for the pen uncapping task. As shown in our [demonstration video](./medias/uncap.mov), when the robotic arm approaches the pen, the RTC-enabled model exhibits notably faster response times compared to the baseline implementation without RTC.
 
 Our implementation includes two key components:
 
@@ -71,7 +71,7 @@ ls -l /dev/ttyDXL*
 ## Run the uncap task
 
 make sure the scene is like this:
-![scene](./assets/scene.webp)
+![scene](./medias/scene.webp)
 
 ```bash
 docker compose -f examples/aloha_real/compose.yml up
