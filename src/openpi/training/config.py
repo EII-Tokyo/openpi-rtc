@@ -569,15 +569,15 @@ _CONFIGS = [
     # This is a test config that is used to illustate how train on a custom LeRobot dataset.
     # For instuctions on how to convert and train on your own Aloha dataset see examples/aloha_real/README.md
     TrainConfig(
-        name="pi0_aloha_pen_uncap",
+        name="pi0_aloha_real",
         model=pi0.Pi0Config(),
         data=LeRobotAlohaDataConfig(
-            repo_id="physical-intelligence/aloha_pen_uncap_diverse",
+            repo_id="lyl472324464/twist",
             assets=AssetsConfig(
                 assets_dir="s3://openpi-assets/checkpoints/pi0_base/assets",
                 asset_id="trossen",
             ),
-            default_prompt="uncap the pen",
+            default_prompt="twist off the bottle cap",
             repack_transforms=_transforms.Group(
                 inputs=[
                     _transforms.RepackTransform(

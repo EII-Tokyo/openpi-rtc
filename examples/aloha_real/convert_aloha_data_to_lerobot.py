@@ -10,14 +10,15 @@ import shutil
 from typing import Literal
 
 import h5py
-from lerobot.common.datasets.lerobot_dataset import LEROBOT_HOME
+from lerobot.common.datasets.lerobot_dataset import HF_LEROBOT_HOME as LEROBOT_HOME
 from lerobot.common.datasets.lerobot_dataset import LeRobotDataset
-from lerobot.common.datasets.push_dataset_to_hub._download_raw import download_raw
+# from lerobot.common.datasets.push_dataset_to_hub._download_raw import download_raw
 import numpy as np
 import torch
 import tqdm
 import tyro
-
+import cv2
+import multiprocessing as mp
 
 @dataclasses.dataclass(frozen=True)
 class DatasetConfig:
@@ -101,7 +102,7 @@ def create_empty_dataset(
     for cam in cameras:
         features[f"observation.images.{cam}"] = {
             "dtype": mode,
-            "shape": (3, 480, 640),
+            "shape": (3, 480, 848),
             "names": [
                 "channels",
                 "height",
@@ -143,7 +144,13 @@ def has_effort(hdf5_files: list[Path]) -> bool:
 
 def load_raw_images_per_camera(ep: h5py.File, cameras: list[str]) -> dict[str, np.ndarray]:
     imgs_per_cam = {}
-    for camera in cameras:
+    data_cameras = [
+        "cam_high",
+        "cam_low",
+        "cam_left_wrist",
+        "cam_right_wrist",
+    ]
+    for index, camera in enumerate(cameras):
         uncompressed = ep[f"/observations/images/{camera}"].ndim == 4
 
         if uncompressed:
@@ -157,8 +164,7 @@ def load_raw_images_per_camera(ep: h5py.File, cameras: list[str]) -> dict[str, n
             for data in ep[f"/observations/images/{camera}"]:
                 imgs_array.append(cv2.cvtColor(cv2.imdecode(data, 1), cv2.COLOR_BGR2RGB))
             imgs_array = np.array(imgs_array)
-
-        imgs_per_cam[camera] = imgs_array
+        imgs_per_cam[data_cameras[index]] = imgs_array
     return imgs_per_cam
 
 
@@ -180,10 +186,10 @@ def load_raw_episode_data(
         imgs_per_cam = load_raw_images_per_camera(
             ep,
             [
-                "cam_high",
-                "cam_low",
-                "cam_left_wrist",
-                "cam_right_wrist",
+                "camera_high",
+                "camera_low",
+                "camera_wrist_left",
+                "camera_wrist_right",
             ],
         )
 
@@ -209,6 +215,7 @@ def populate_dataset(
             frame = {
                 "observation.state": state[i],
                 "action": action[i],
+                "task": task,
             }
 
             for camera, img_array in imgs_per_cam.items():
@@ -221,7 +228,7 @@ def populate_dataset(
 
             dataset.add_frame(frame)
 
-        dataset.save_episode(task=task)
+        dataset.save_episode()
 
     return dataset
 
@@ -241,12 +248,13 @@ def port_aloha(
     if (LEROBOT_HOME / repo_id).exists():
         shutil.rmtree(LEROBOT_HOME / repo_id)
 
-    if not raw_dir.exists():
-        if raw_repo_id is None:
-            raise ValueError("raw_repo_id must be provided if raw_dir does not exist")
-        download_raw(raw_dir, repo_id=raw_repo_id)
+    # if not raw_dir.exists():
+    #     if raw_repo_id is None:
+    #         raise ValueError("raw_repo_id must be provided if raw_dir does not exist")
+    #     download_raw(raw_dir, repo_id=raw_repo_id)
 
     hdf5_files = sorted(raw_dir.glob("episode_*.hdf5"))
+    # hdf5_files = hdf5_files[:2]
 
     dataset = create_empty_dataset(
         repo_id,
@@ -262,7 +270,6 @@ def port_aloha(
         task=task,
         episodes=episodes,
     )
-    dataset.consolidate()
 
     if push_to_hub:
         dataset.push_to_hub()

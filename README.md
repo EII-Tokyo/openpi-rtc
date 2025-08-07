@@ -79,13 +79,27 @@ docker compose -f examples/aloha_real/compose.yml up
 
 ## Training on your own Aloha dataset
 
-1. Convert the dataset to the LeRobot dataset v2.0 format. 
+1. Convert the hdf5 dataset to the LeRobot dataset v2.0 format. 
     
     We provide a script [convert_aloha_data_to_lerobot.py](./examples/aloha_real/convert_aloha_data_to_lerobot.py) that converts the dataset to the LeRobot dataset v2.0 format. As an example we have converted the `aloha_pen_uncap_diverse_raw` dataset from the [BiPlay repo](https://huggingface.co/datasets/oier-mees/BiPlay/tree/main/aloha_pen_uncap_diverse_raw) and uploaded it to the HuggingFace Hub as [physical-intelligence/aloha_pen_uncap_diverse](https://huggingface.co/datasets/physical-intelligence/aloha_pen_uncap_diverse). 
 
+    ```bash
+    uv run examples/aloha_real/convert_aloha_data_to_lerobot.py --raw_dir /path/to/raw/data --repo_id <org>/<dataset-name> --task <task-name>
+    ```
+
+    If you want to upload the dataset to the HuggingFace Hub, you can use the `--push_to_hub` flag. First, you need to install `huggingface-cli` using `pip install huggingface-cli` and login to the HuggingFace Hub by running `huggingface-cli auth login`. You can get your authentication token from [here](https://huggingface.co/settings/tokens).
 
 2. Define a training config that uses the custom dataset. 
 
-    We provide the [pi0_aloha_pen_uncap config](../../src/openpi/training/config.py) as an example. You should refer to the root [README](../../README.md) for how to run training with the new config.
+    Change the `repo_id` and `default_prompt` in the [pi0_aloha_real config](../../src/openpi/training/config.py) to <org>/<dataset-name> and <task-name> from the first step.
+
+    Register for Weights & Biases and get your API key from [here](https://wandb.ai/authorize).
+
+    **Training:**
+    ```bash
+    XLA_PYTHON_CLIENT_MEM_FRACTION=0.9 uv run scripts/train.py pi0_aloha_real --exp-name=<exp-name> --overwrite
+    ```
+
+    Paste wandb api key to the terminal when prompted.
  
 IMPORTANT: Our base checkpoint includes normalization stats from various common robot configurations. When fine-tuning a base checkpoint with a custom dataset from one of these configurations, we recommend using the corresponding normalization stats provided in the base checkpoint. In the example, this is done by specifying the trossen asset_id and a path to the pretrained checkpoint’s asset directory within the AssetsConfig.
