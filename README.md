@@ -89,7 +89,7 @@ docker compose -f examples/aloha_real/compose.yml up
 
     If you want to upload the dataset to the HuggingFace Hub, you can use the `--push_to_hub` flag. First, you need to install `huggingface-cli` using `pip install huggingface-cli` and login to the HuggingFace Hub by running `huggingface-cli auth login`. You can get your authentication token from [here](https://huggingface.co/settings/tokens).
 
-2. Define a training config that uses the custom dataset. 
+2. Training
 
     Change the `repo_id` and `default_prompt` in the [pi0_aloha_real config](../../src/openpi/training/config.py) to <org>/<dataset-name> and <task-name> from the first step.
 
