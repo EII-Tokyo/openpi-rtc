@@ -39,8 +39,13 @@ class RealEnv:
 
     def __init__(self, init_node, *, reset_position: Optional[List[float]] = None, setup_robots: bool = True):
         # reset_position = START_ARM_POSE[:6]
-        self._reset_position = reset_position[:6] if reset_position else DEFAULT_RESET_POSITION
-
+        # self._reset_position = reset_position[:6] if reset_position else DEFAULT_RESET_POSITION
+        # self._reset_position = [DEFAULT_RESET_POSITION, DEFAULT_RESET_POSITION]
+        self._reset_position = [
+            [0.0, -0.96, 1.16, 0.0, -0.0, 0.0],
+            [0.0, -0.96, 1.16, 1.57, -0.0, -1.57],
+            
+        ]
         self.puppet_bot_left = InterbotixManipulatorXS(
             robot_model="vx300s",
             group_name="arm",
@@ -70,10 +75,10 @@ class RealEnv:
         right_arm_qpos = right_qpos_raw[:6]
         left_gripper_qpos = [
             constants.PUPPET_GRIPPER_POSITION_NORMALIZE_FN(left_qpos_raw[7])
-        ]  # this is position not joint
+        ]  # this is position in origin pi0, but I change it to angular
         right_gripper_qpos = [
             constants.PUPPET_GRIPPER_POSITION_NORMALIZE_FN(right_qpos_raw[7])
-        ]  # this is position not joint
+        ]  # this is position in origin pi0, but I change it to angular
         return np.concatenate([left_arm_qpos, left_gripper_qpos, right_arm_qpos, right_gripper_qpos])
 
     def get_qvel(self):
@@ -109,7 +114,7 @@ class RealEnv:
 
     def _reset_joints(self):
         robot_utils.move_arms(
-            [self.puppet_bot_left, self.puppet_bot_right], [self._reset_position, self._reset_position], move_time=1
+            [self.puppet_bot_left, self.puppet_bot_right], self._reset_position, move_time=1
         )
 
     def _reset_gripper(self):

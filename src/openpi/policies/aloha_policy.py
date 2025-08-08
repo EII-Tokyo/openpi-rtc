@@ -194,7 +194,7 @@ def _decode_state(state: np.ndarray, *, adapt_to_pi: bool = False) -> np.ndarray
         # Flip the joints.
         state = _joint_flip_mask() * state
         # Reverse the gripper transformation that is being applied by the Aloha runtime.
-        state[[6, 13]] = _gripper_to_angular(state[[6, 13]])
+        state[[6, 13]] = _gripper_to_angular(state[[6, 13]]) # Do not need any more, because I will record angular when collecting data
     return state
 
 
