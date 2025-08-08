@@ -79,17 +79,25 @@ docker compose -f examples/aloha_real/compose.yml up
 
 ## Training on your own Aloha dataset
 
-1. Convert the hdf5 dataset to the LeRobot dataset v2.0 format. 
-    
-    We provide a script [convert_aloha_data_to_lerobot.py](./examples/aloha_real/convert_aloha_data_to_lerobot.py) that converts the dataset to the LeRobot dataset v2.0 format. As an example we have converted the `aloha_pen_uncap_diverse_raw` dataset from the [BiPlay repo](https://huggingface.co/datasets/oier-mees/BiPlay/tree/main/aloha_pen_uncap_diverse_raw) and uploaded it to the HuggingFace Hub as [physical-intelligence/aloha_pen_uncap_diverse](https://huggingface.co/datasets/physical-intelligence/aloha_pen_uncap_diverse). 
+1. Start the docker container.
 
     ```bash
-    uv run examples/aloha_real/convert_aloha_data_to_lerobot.py --raw_dir /path/to/raw/data --repo_id <org>/<dataset-name> --task <task-name>
+    docker run -it --rm --gpus all -v /path/to/raw/data:/data -v ./:/app -v ~/.cache/openpi:/openpi_assets lyl472324464/robot:openpi_server /bin/bash
     ```
 
-    If you want to upload the dataset to the HuggingFace Hub, you can use the `--push_to_hub` flag. First, you need to install `huggingface-cli` using `pip install huggingface-cli` and login to the HuggingFace Hub by running `huggingface-cli auth login`. You can get your authentication token from [here](https://huggingface.co/settings/tokens).
+2. Convert the hdf5 dataset to the LeRobot dataset v2.0 format.  
 
-2. Training
+    - Option: Login to the HuggingFace Hub
+
+    ```bash
+    huggingface-cli login
+    ```
+
+    ```bash
+    uv run examples/aloha_real/convert_aloha_data_to_lerobot.py --raw_dir /data --repo_id <org>/<dataset-name> --task <task-name>
+    ```
+
+3. Define a training config that uses the custom dataset.
 
     Change the `repo_id` and `default_prompt` in the [pi0_aloha_real config](../../src/openpi/training/config.py) to <org>/<dataset-name> and <task-name> from the first step.
 
