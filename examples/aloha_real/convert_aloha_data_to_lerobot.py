@@ -19,6 +19,12 @@ import tqdm
 import tyro
 import cv2
 import multiprocessing as mp
+from functools import partial
+import logging
+
+# 设置日志
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 @dataclasses.dataclass(frozen=True)
 class DatasetConfig:
@@ -27,6 +33,7 @@ class DatasetConfig:
     image_writer_processes: int = 10
     image_writer_threads: int = 5
     video_backend: str | None = None
+    num_processes: int = 4  # 新增多进程数量配置
 
 
 DEFAULT_DATASET_CONFIG = DatasetConfig()
@@ -42,13 +49,6 @@ def create_empty_dataset(
     dataset_config: DatasetConfig = DEFAULT_DATASET_CONFIG,
 ) -> LeRobotDataset:
     motors = [
-        "right_waist",
-        "right_shoulder",
-        "right_elbow",
-        "right_forearm_roll",
-        "right_wrist_angle",
-        "right_wrist_rotate",
-        "right_gripper",
         "left_waist",
         "left_shoulder",
         "left_elbow",
@@ -56,6 +56,13 @@ def create_empty_dataset(
         "left_wrist_angle",
         "left_wrist_rotate",
         "left_gripper",
+        "right_waist",
+        "right_shoulder",
+        "right_elbow",
+        "right_forearm_roll",
+        "right_wrist_angle",
+        "right_wrist_rotate",
+        "right_gripper",       
     ]
     cameras = [
         "cam_high",
@@ -142,7 +149,7 @@ def has_effort(hdf5_files: list[Path]) -> bool:
         return "/observations/effort" in ep
 
 
-def load_raw_images_per_camera(ep: h5py.File, cameras: list[str]) -> dict[str, np.ndarray]:
+def load_raw_images_per_camera(ep: h5py.File, cameras: list[str]) -> dict[str, np.ndarray] | None:
     imgs_per_cam = {}
     data_cameras = [
         "cam_high",
@@ -161,8 +168,28 @@ def load_raw_images_per_camera(ep: h5py.File, cameras: list[str]) -> dict[str, n
 
             # load one compressed image after the other in RAM and uncompress
             imgs_array = []
-            for data in ep[f"/observations/images/{camera}"]:
-                imgs_array.append(cv2.cvtColor(cv2.imdecode(data, 1), cv2.COLOR_BGR2RGB))
+            for i, data in enumerate(ep[f"/observations/images/{camera}"]):
+                # 检查数据是否为空
+                if data is None or len(data) == 0:
+                    logger.warning(f"Episode {ep.filename}, camera {camera}, frame {i}: 数据为空，整个episode将被跳过")
+                    return None
+                
+                try:
+                    decoded_img = cv2.imdecode(data, 1)
+                    if decoded_img is None:
+                        logger.warning(f"Episode {ep.filename}, camera {camera}, frame {i}: 图像解码失败，整个episode将被跳过")
+                        return None
+                    
+                    rgb_img = cv2.cvtColor(decoded_img, cv2.COLOR_BGR2RGB)
+                    imgs_array.append(rgb_img)
+                except Exception as e:
+                    logger.warning(f"Episode {ep.filename}, camera {camera}, frame {i}: 处理图像时出错 {e}，整个episode将被跳过")
+                    return None
+            
+            if len(imgs_array) == 0:
+                logger.error(f"Episode {ep.filename}, camera {camera}: 所有帧都为空或无效，整个episode将被跳过")
+                return None
+                
             imgs_array = np.array(imgs_array)
         imgs_per_cam[data_cameras[index]] = imgs_array
     return imgs_per_cam
@@ -170,18 +197,19 @@ def load_raw_images_per_camera(ep: h5py.File, cameras: list[str]) -> dict[str, n
 
 def load_raw_episode_data(
     ep_path: Path,
-) -> tuple[dict[str, np.ndarray], torch.Tensor, torch.Tensor, torch.Tensor | None, torch.Tensor | None]:
+) -> tuple[dict[str, np.ndarray] | None, torch.Tensor, torch.Tensor, torch.Tensor | None, torch.Tensor | None]:
     with h5py.File(ep_path, "r") as ep:
-        state = torch.from_numpy(ep["/observations/qpos"][:])
-        action = torch.from_numpy(ep["/action"][:])
+        # 重新排列关节顺序：将右臂关节(7:)放在前面，左臂关节(:7)放在后面
+        state = torch.from_numpy(np.concatenate([ep["/observations/qpos"][:, 7:], ep["/observations/qpos"][:, :7]], axis=1))
+        action = torch.from_numpy(np.concatenate([ep["/action"][:, 7:], ep["/action"][:, :7]], axis=1))
 
         velocity = None
         if "/observations/qvel" in ep:
-            velocity = torch.from_numpy(ep["/observations/qvel"][:])
+            velocity = torch.from_numpy(np.concatenate([ep["/observations/qvel"][:, 7:], ep["/observations/qvel"][:, :7]], axis=1))
 
         effort = None
         if "/observations/effort" in ep:
-            effort = torch.from_numpy(ep["/observations/effort"][:])
+            effort = torch.from_numpy(np.concatenate([ep["/observations/effort"][:, 7:], ep["/observations/effort"][:, :7]], axis=1))
 
         imgs_per_cam = load_raw_images_per_camera(
             ep,
@@ -196,21 +224,20 @@ def load_raw_episode_data(
     return imgs_per_cam, state, action, velocity, effort
 
 
-def populate_dataset(
-    dataset: LeRobotDataset,
-    hdf5_files: list[Path],
-    task: str,
-    episodes: list[int] | None = None,
-) -> LeRobotDataset:
-    if episodes is None:
-        episodes = range(len(hdf5_files))
-
-    for ep_idx in tqdm.tqdm(episodes):
-        ep_path = hdf5_files[ep_idx]
-
+def process_single_episode(args):
+    """处理单个episode的函数，用于多进程"""
+    ep_path, task = args
+    try:
         imgs_per_cam, state, action, velocity, effort = load_raw_episode_data(ep_path)
+        
+        # 如果图像数据为空，跳过整个episode
+        if imgs_per_cam is None:
+            logger.warning(f"Episode {ep_path.name}: 图像数据为空，跳过整个episode")
+            return None, ep_path.name
+        
         num_frames = state.shape[0]
-
+        
+        frames = []
         for i in range(num_frames):
             frame = {
                 "observation.state": state[i],
@@ -226,9 +253,45 @@ def populate_dataset(
             if effort is not None:
                 frame["observation.effort"] = effort[i]
 
-            dataset.add_frame(frame)
+            frames.append(frame)
+        
+        return frames, ep_path.name
+    except Exception as e:
+        logger.error(f"处理episode {ep_path} 时出错: {e}")
+        return None, ep_path.name
 
-        dataset.save_episode()
+
+def populate_dataset(
+    dataset: LeRobotDataset,
+    hdf5_files: list[Path],
+    task: str,
+    episodes: list[int] | None = None,
+    dataset_config: DatasetConfig = DEFAULT_DATASET_CONFIG,
+) -> LeRobotDataset:
+    if episodes is None:
+        episodes = range(len(hdf5_files))
+    
+    # 准备多进程参数
+    episode_paths = [hdf5_files[ep_idx] for ep_idx in episodes]
+    process_args = [(ep_path, task) for ep_path in episode_paths]
+    
+    # 使用多进程处理
+    with mp.Pool(processes=dataset_config.num_processes) as pool:
+        results = list(tqdm.tqdm(
+            pool.imap(process_single_episode, process_args),
+            total=len(process_args),
+            desc="处理episodes"
+        ))
+    
+    # 收集结果并添加到数据集
+    for frames, ep_name in results:
+        if frames is not None:
+            for frame in frames:
+                dataset.add_frame(frame)
+            dataset.save_episode()
+            logger.info(f"成功处理episode: {ep_name}")
+        else:
+            logger.warning(f"跳过无效episode: {ep_name}")
 
     return dataset
 
@@ -269,6 +332,7 @@ def port_aloha(
         hdf5_files,
         task=task,
         episodes=episodes,
+        dataset_config=dataset_config,
     )
 
     if push_to_hub:

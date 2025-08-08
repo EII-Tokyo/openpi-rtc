@@ -572,7 +572,7 @@ _CONFIGS = [
         name="pi0_aloha_real",
         model=pi0.Pi0Config(),
         data=LeRobotAlohaDataConfig(
-            repo_id="lyl472324464/twist",
+            repo_id="physical-intelligence/aloha_pen_uncap_diverse",
             assets=AssetsConfig(
                 assets_dir="s3://openpi-assets/checkpoints/pi0_base/assets",
                 asset_id="trossen",
@@ -596,8 +596,8 @@ _CONFIGS = [
         ),
         weight_loader=weight_loaders.CheckpointWeightLoader("s3://openpi-assets/checkpoints/pi0_base/params"),
         num_train_steps=20_000,
-        batch_size=1,
-        save_interval=10,
+        batch_size=32,
+        save_interval=1000,
     ),
     # This config is used to demonstrate how to train on a simple simulated environment.
     TrainConfig(
