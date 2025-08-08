@@ -82,7 +82,7 @@ docker compose -f examples/aloha_real/compose.yml up
 1. Start the docker container.
 
     ```bash
-    docker run -it --rm --gpus all -v /path/to/raw/data:/data -v ./:/app -v ~/.cache/openpi:/openpi_assets lyl472324464/robot:openpi_server /bin/bash
+    docker run -it --rm --gpus all -v <path_to_your_data>:/data -v ./:/app -v ~/.cache/openpi:/openpi_assets lyl472324464/robot:openpi_server /bin/bash
     ```
 
 2. Convert the hdf5 dataset to the LeRobot dataset v2.0 format.  
@@ -90,7 +90,7 @@ docker compose -f examples/aloha_real/compose.yml up
     - Option: Login to the HuggingFace Hub
 
     ```bash
-    huggingface-cli login
+    uv run huggingface-cli login
     ```
 
     ```bash
