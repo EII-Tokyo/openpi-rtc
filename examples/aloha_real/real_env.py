@@ -65,8 +65,8 @@ class RealEnv:
         self.gripper_command = JointSingleCommand(name="gripper")
 
     def setup_robots(self):
-        robot_utils.setup_puppet_bot(self.puppet_bot_left)
-        robot_utils.setup_puppet_bot(self.puppet_bot_right)
+        robot_utils.setup_puppet_bot(self.puppet_bot_left, current_limit=300)
+        robot_utils.setup_puppet_bot(self.puppet_bot_right, current_limit=550)
 
     def get_qpos(self):
         left_qpos_raw = self.recorder_left.qpos
@@ -74,11 +74,16 @@ class RealEnv:
         left_arm_qpos = left_qpos_raw[:6]
         right_arm_qpos = right_qpos_raw[:6]
         left_gripper_qpos = [
-            constants.PUPPET_GRIPPER_POSITION_NORMALIZE_FN(left_qpos_raw[7])
+            # (left_qpos_raw[6] - 0.4) / 1.1
+            constants.PUPPET_GRIPPER_JOINT_NORMALIZE_FN(left_qpos_raw[6])
+            # constants.PUPPET_GRIPPER_POSITION_NORMALIZE_FN(left_qpos_raw[7])
         ]  # this is position in origin pi0, but I change it to angular
         right_gripper_qpos = [
-            constants.PUPPET_GRIPPER_POSITION_NORMALIZE_FN(right_qpos_raw[7])
+            # (right_qpos_raw[6] - 0.4) / 1.1
+            constants.PUPPET_GRIPPER_JOINT_NORMALIZE_FN(right_qpos_raw[6])
+            # constants.PUPPET_GRIPPER_POSITION_NORMALIZE_FN(right_qpos_raw[7])
         ]  # this is position in origin pi0, but I change it to angular
+        # print(left_gripper_qpos, right_gripper_qpos)
         return np.concatenate([left_arm_qpos, left_gripper_qpos, right_arm_qpos, right_gripper_qpos])
 
     def get_qvel(self):
@@ -154,6 +159,8 @@ class RealEnv:
         right_action = action[state_len:]
         self.puppet_bot_left.arm.set_joint_positions(left_action[:6], blocking=False)
         self.puppet_bot_right.arm.set_joint_positions(right_action[:6], blocking=False)
+        print("left gripper current limit", self.puppet_bot_left.dxl.robot_get_motor_registers("single", "gripper", "Current_Limit"))
+        print("right gripper current limit", self.puppet_bot_right.dxl.robot_get_motor_registers("single", "gripper", "Current_Limit"))
         self.set_gripper_pose(left_action[-1], right_action[-1])
         time.sleep(constants.DT)
         return dm_env.TimeStep(

@@ -158,12 +158,12 @@ def _gripper_from_angular(value):
 
     # These values are coming from the Aloha code:
     # PUPPET_GRIPPER_JOINT_OPEN, PUPPET_GRIPPER_JOINT_CLOSE
-    return _normalize(value, min_val=-0.6213, max_val=1.4910)
+    return _normalize(value, min_val=0.6197, max_val=1.6214)
 
 
 def _gripper_from_angular_inv(value):
     # Directly inverts the gripper_from_angular function.
-    value = _unnormalize(value, min_val=-0.6213, max_val=1.4910)
+    value = _unnormalize(value, min_val=0.6197, max_val=1.6214)
     return _normalize(value, min_val=0.4, max_val=1.5)
 
 
@@ -194,7 +194,8 @@ def _decode_state(state: np.ndarray, *, adapt_to_pi: bool = False) -> np.ndarray
         # Flip the joints.
         state = _joint_flip_mask() * state
         # Reverse the gripper transformation that is being applied by the Aloha runtime.
-        state[[6, 13]] = _gripper_to_angular(state[[6, 13]]) # Do not need any more, because I will record angular when collecting data
+        # state[[6, 13]] = _gripper_to_angular(state[[6, 13]]) # Do not need any more, because I will record angular when collecting data
+        # print(state[[6, 13]])
     return state
 
 
@@ -203,7 +204,7 @@ def _encode_actions(actions: np.ndarray, *, adapt_to_pi: bool = False) -> np.nda
     if adapt_to_pi:
         # Flip the joints.
         actions = _joint_flip_mask() * actions
-        actions[:, [6, 13]] = _gripper_from_angular(actions[:, [6, 13]])
+        # actions[:, [6, 13]] = _gripper_from_angular(actions[:, [6, 13]])
     # print(actions.shape, actions[0][6], actions[0][13], 44)
     return actions
 
@@ -211,5 +212,5 @@ def _encode_actions(actions: np.ndarray, *, adapt_to_pi: bool = False) -> np.nda
 def _encode_actions_inv(actions: np.ndarray, *, adapt_to_pi: bool = False) -> np.ndarray:
     if adapt_to_pi:
         actions = _joint_flip_mask() * actions
-        actions[:, [6, 13]] = _gripper_from_angular_inv(actions[:, [6, 13]])
+        # actions[:, [6, 13]] = _gripper_from_angular_inv(actions[:, [6, 13]])
     return actions
